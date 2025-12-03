@@ -1,34 +1,50 @@
-const Playlist = require('../models/Playlist');
-const Track = require('../models/Track');
-const { generatePlaylist } = require('../services/llmService');
+import Playlist from "../models/Playlist.js";
+import Track from "../models/Track.js";
+import { generatePlaylist } from "../services/llmService.js";
 
-async function createPlaylist(req, res) {
+export async function createPlaylist(req, res) {
   try {
     const { mood } = req.body;
+
     const allTracks = await Track.find();
 
     const llmResult = await generatePlaylist(mood, allTracks);
-    const tracksData = llmResult.map((t, idx) => {
-      const track = allTracks.find(a => a.title === t.title);
+
+    const tracksData = [];
+
+    for (let i = 0; i < llmResult.length; i++) {
+      const item = llmResult[i];
+
+      const track = allTracks.find(t => t.title === item.title);
+
       if (track) {
         track.playCount += 1;
-        track.save();
-        return { trackId: track._id, order: idx + 1, weight: t.weight };
+        await track.save();
+
+        tracksData.push({
+          trackId: track._id,
+          order: i + 1,
+          weight: item.weight ?? 1
+        });
       }
-      return null;
-    }).filter(Boolean);
+    }
 
     const playlist = new Playlist({ mood, tracks: tracksData });
     await playlist.save();
+
     res.json(playlist);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
 
-async function getPlaylist(req, res) {
-  const playlist = await Playlist.findById(req.params.id).populate('tracks.trackId');
-  res.json(playlist);
-}
+export async function getPlaylist(req, res) {
+  try {
+    const playlist = await Playlist.findById(req.params.id)
+      .populate("tracks.trackId");
 
-module.exports = { createPlaylist, getPlaylist };
+    res.json(playlist);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
