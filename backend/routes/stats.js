@@ -1,7 +1,8 @@
-const express = require('express');
+import express from "express";
+import { getTopTracks } from "../controllers/statsController.js";
+
 const router = express.Router();
-const { getTopTracks } = require('../controllers/statsController');
 
-router.get('/top-tracks', getTopTracks);
+router.get("/top-tracks", getTopTracks);
 
-module.exports = router;
+export default router;
