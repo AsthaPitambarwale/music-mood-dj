@@ -1,0 +1,36 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs
+*.log
+log.txt
+
+# Environment
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Build output
+dist/
+build/
+.vercel/
+.next/
+out/
+
+# Cache
+.cache/
+.tmp/
+.vscode/
+.DS_Store
+
+# Backend uploads folder (OPTIONAL — if you want it in git, remove this)
+uploads/
+
+# OS
+Thumbs.db

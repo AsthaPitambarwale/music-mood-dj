@@ -1,0 +1,71 @@
+:root {
+font-family: Inter, system-ui, sans-serif;
+background: var(--bg);
+color: var(--text);
+}
+
+
+.card {
+background: var(--card);
+border: 1px solid var(--border);
+border-radius: var(--radius);
+padding: 16px;
+box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
+
+.btn-primary {
+background: var(--primary);
+color: white;
+padding: 8px 16px;
+border-radius: var(--radius);
+border: none;
+cursor: pointer;
+}
+.btn-primary:hover {
+background: var(--primary-hover);
+}
+
+
+.input {
+padding: 8px 12px;
+border: 1px solid var(--border);
+border-radius: var(--radius);
+width: 100%;
+margin-top: 4px;
+margin-bottom: 4px;
+font-size: 15px;
+}
+
+
+.audio-player {
+display: flex;
+align-items: center;
+gap: 12px;
+margin-top: 8px;
+}
+
+
+.list {
+margin-top: 12px;
+border: 1px solid var(--border);
+border-radius: var(--radius);
+padding: 10px;
+background: #fafafa;
+}
+
+
+.list-item {
+padding: 8px;
+border-radius: var(--radius);
+margin-bottom: 6px;
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+
+
+.list-item-active {
+background: #fff;
+box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
