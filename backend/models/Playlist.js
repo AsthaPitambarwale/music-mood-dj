@@ -1,13 +1,18 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 
-const playlistSchema = new mongoose.Schema({
-  mood: String,
-  tracks: [{
-    trackId: { type: mongoose.Schema.Types.ObjectId, ref: 'Track' },
-    order: Number,
-    weight: Number
-  }],
-  createdAt: { type: Date, default: Date.now }
-});
+const playlistSchema = new mongoose.Schema(
+  {
+    mood: { type: String, required: true },
+    tracks: [
+      {
+        trackId: { type: mongoose.Schema.Types.ObjectId, ref: "Track" },
+        order: Number,
+        weight: Number,
+      },
+    ],
+  },
+  { timestamps: true }
+);
 
-module.exports = mongoose.model('Playlist', playlistSchema);
+const Playlist = mongoose.model("Playlist", playlistSchema);
+export default Playlist;
