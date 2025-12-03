@@ -8,6 +8,10 @@ import dotenv from "dotenv";
 
 import Track from "./models/Track.js";
 
+import playlistRoutes from "./routes/playlists.js";
+import statsRoutes from "./routes/stats.js";
+import trackRoutes from "./routes/tracks.js";
+
 dotenv.config();
 
 const app = express();
@@ -36,10 +40,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     const result = await new Promise((resolve, reject) => {
       const cloudStream = cloudinary.uploader.upload_stream(
-        { resource_type: "video" }, // for audio & video
+        { resource_type: "video" },
         (error, result) => (error ? reject(error) : resolve(result))
       );
-
       stream.pipe(cloudStream);
     });
 
@@ -65,6 +68,10 @@ app.get("/tracks", async (req, res) => {
   const tracks = await Track.find().sort({ createdAt: -1 });
   res.json(tracks);
 });
+
+app.use("/api/playlists", playlistRoutes);
+app.use("/api/stats", statsRoutes);
+app.use("/api/tracks", trackRoutes);
 
 app.get("/", (req, res) => res.send("Backend Running ✔"));
 
