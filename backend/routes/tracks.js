@@ -1,8 +1,10 @@
-const express = require('express');
+import express from "express";
+import { upload, uploadTrack, listTracks } from "../controllers/trackController.js";
+
 const router = express.Router();
-const { upload, uploadTrack, listTracks } = require('../controllers/trackController');
 
-router.post('/upload', upload.single('file'), uploadTrack);
-router.get('/', listTracks);
+router.post("/upload", upload.single("file"), uploadTrack);
 
-module.exports = router;
+router.get("/", listTracks);
+
+export default router;
