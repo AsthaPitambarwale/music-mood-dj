@@ -1,8 +1,7 @@
-// app.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config(); // loads .env from project root
+require('dotenv').config();
 
 const tracksRoute = require('./routes/tracks');
 const playlistsRoute = require('./routes/playlists');
