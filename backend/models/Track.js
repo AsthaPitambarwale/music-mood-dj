@@ -1,14 +1,16 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 
 const trackSchema = new mongoose.Schema(
   {
-    title: String,
-    artist: String,
-    url: String,
-    publicId: String,
-    duration: Number,
+    title: { type: String, required: true },
+    artist: { type: String, default: "Unknown" },
+    url: { type: String, required: true },
+    publicId: { type: String },
+    duration: { type: Number },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Track", trackSchema);
+const Track = mongoose.model("Track", trackSchema);
+
+export default Track;
