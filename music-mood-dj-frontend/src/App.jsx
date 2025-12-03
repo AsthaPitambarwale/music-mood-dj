@@ -53,23 +53,44 @@ export default function App() {
   }
 
   async function handleUpload(e) {
-    e.preventDefault();
-    if (!file) return alert('Select a file!');
-    setLoading(true);
+  e.preventDefault();
+  if (!file) return alert("Select a file!");
+
+  setLoading(true);
+  try {
     const form = new FormData();
-    form.append('file', file);
-    form.append('title', title || file.name);
-    form.append('artist', artist || 'Unknown');
-    try {
-      const res = await fetch(`${API_BASE}/tracks/upload`, { method: 'POST', body: form });
-      const newTrack = await res.json();
-      setTracks(p => [newTrack, ...p]);
-      setFile(null); setTitle(''); setArtist('');
-      alert('Upload successful!');
-    } catch {
-      alert('Upload failed');
-    } finally { setLoading(false); }
+    form.append("file", file);
+    form.append("title", title || file.name);
+    form.append("artist", artist || "Unknown");
+
+    const res = await fetch(`${API_BASE}/upload`, {
+      method: "POST",
+      body: form,
+    });
+
+    const data = await res.json();
+    console.log("Uploaded:", data);
+
+    setTracks((p) => [
+      {
+        title: data.title || title,
+        artist: data.artist || artist,
+        filePath: data.url,
+      },
+      ...p,
+    ]);
+
+    setFile(null);
+    setTitle("");
+    setArtist("");
+    alert("Upload successful!");
+  } catch (err) {
+    console.error(err);
+    alert("Upload failed");
+  } finally {
+    setLoading(false);
   }
+}
 
   async function handleGenerate(e) {
     e.preventDefault();
