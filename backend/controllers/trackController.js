@@ -1,38 +1,50 @@
-const Track = require('../models/Track');
-const multer = require('multer');
-const path = require('path');
+import Track from "../models/Track.js";
+import multer from "multer";
+import path from "path";
+import cloudinary from "cloudinary";
+import fs from "fs";
 
-// Multer setup
+// multer local upload
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
+  destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     cb(null, Date.now() + ext);
   }
 });
-const upload = multer({ storage });
 
-async function uploadTrack(req, res) {
+export const upload = multer({ storage });
+
+export async function uploadTrack(req, res) {
   try {
     const { title, artist } = req.body;
     const file = req.file;
+
     if (!file) return res.status(400).send("No file uploaded");
+
+    const cloud = await cloudinary.v2.uploader.upload(file.path, {
+      resource_type: "video",
+    });
+
+    // delete local file
+    fs.unlinkSync(file.path);
 
     const track = new Track({
       title,
       artist,
-      filePath: `/uploads/${file.filename}`
+      url: cloud.secure_url,
+      publicId: cloud.public_id
     });
+
     await track.save();
+
     res.json(track);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
 
-async function listTracks(req, res) {
+export async function listTracks(req, res) {
   const tracks = await Track.find();
   res.json(tracks);
 }
-
-module.exports = { upload, uploadTrack, listTracks };
