@@ -1,8 +1,9 @@
-const express = require('express');
+import express from "express";
+import { createPlaylist, getPlaylist } from "../controllers/playlistController.js";
+
 const router = express.Router();
-const { createPlaylist, getPlaylist } = require('../controllers/playlistController');
 
-router.post('/generate', createPlaylist);
-router.get('/:id', getPlaylist);
+router.post("/", createPlaylist);
+router.get("/:id", getPlaylist);
 
-module.exports = router;
+export default router;
