@@ -186,6 +186,7 @@ export default function App() {
               <input type="file" accept="audio/*" onChange={e => setFile(e.target.files[0] || null)} style={inputStyle} />
               <input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} style={inputStyle} />
               <input placeholder="Artist" value={artist} onChange={e => setArtist(e.target.value)} style={inputStyle} />
+              <input placeholder="Mood" value={mood} onChange={e => setMood(e.target.value)} />
               <button type="submit" disabled={loading} style={btnPrimary}>{loading ? 'Uploading...' : 'Upload'}</button>
             </form>
           </section>
