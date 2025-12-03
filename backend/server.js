@@ -6,7 +6,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { Readable } from "stream";
 import dotenv from "dotenv";
 
-import Track from "./models/track.js"; // <-- USE EXISTING MODEL
+import Track from "./models/Track.js";
 
 dotenv.config();
 
