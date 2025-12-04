@@ -6,18 +6,29 @@ export async function createPlaylist(req, res) {
   try {
     const { mood } = req.body;
 
-    const allTracks = await Track.find();
+    let moodTracks = await Track.find({ mood: { $regex: mood, $options: "i" } });
 
-    const llmResult = await generatePlaylist(mood, allTracks);
+    if (moodTracks.length === 0) {
+      console.log("⚠️ No tracks found for mood:", mood, " → Using all tracks.");
+      moodTracks = await Track.find();
+    }
+
+    const llmResult = await generatePlaylist(mood, moodTracks);
+
+    if (!Array.isArray(llmResult) || llmResult.length === 0) {
+      return res.status(400).json({ error: "Failed to generate playlist." });
+    }
 
     const tracksData = [];
 
     for (let i = 0; i < llmResult.length; i++) {
       const item = llmResult[i];
 
-      const track = allTracks.find(t => t.title === item.title);
+      // find track
+      const track = moodTracks.find(t => t.title === item.title);
 
       if (track) {
+        // update play count
         track.playCount += 1;
         await track.save();
 
@@ -29,7 +40,11 @@ export async function createPlaylist(req, res) {
       }
     }
 
-    const playlist = new Playlist({ mood, tracks: tracksData });
+    const playlist = new Playlist({
+      mood,
+      tracks: tracksData
+    });
+
     await playlist.save();
 
     res.json(playlist);
