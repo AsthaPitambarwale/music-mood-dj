@@ -298,7 +298,7 @@ export default function App() {
 const cardStyle = { background: "var(--card-bg)", borderRadius: 16, padding: 20, boxShadow: "0 4px 14px rgba(0,0,0,0.08)", marginBottom: 24 };
 const playlistBox = { marginTop: 14, background: "var(--card-bg-alpha)", padding: 12, borderRadius: 12, fontSize: 14 };
 const sectionTitle = { fontSize: 18, fontWeight: 700, marginBottom: 16 };
-const inputStyle = { width: "100%", padding: "12px 16px", border: "1px solid var(--border-color)", borderRadius: 10, background: "var(--input-bg)", color: "var(--text-color)", fontSize: 14, marginBottom: 14 };
+const inputStyle = { width: "95%", padding: "12px 16px", border: "1px solid var(--border-color)", borderRadius: 10, background: "var(--input-bg)", color: "var(--text-color)", fontSize: 14, marginBottom: 14 };
 const btnPrimary = { width: "100%", padding: "12px 16px", borderRadius: 10, border: "none", background: "var(--btn-bg)", color: "#fff", fontWeight: 700, cursor: "pointer" };
 const btnPrimarySmall = { padding: "8px 14px", borderRadius: 10, border: "none", background: "var(--btn-bg)", color: "#fff", fontWeight: 600, cursor: "pointer" };
 const listItem = { display: "flex", justifyContent: "space-between", padding: 12, marginBottom: 12, borderRadius: 10, border: "1px solid var(--border-color)", background: "var(--card-bg-alpha)" };
