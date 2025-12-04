@@ -17,7 +17,7 @@ export const upload = multer({ storage });
 
 export async function uploadTrack(req, res) {
   try {
-    const { title, artist } = req.body;
+    const { title, artist, mood } = req.body;  
     const file = req.file;
 
     if (!file) return res.status(400).send("No file uploaded");
@@ -32,6 +32,7 @@ export async function uploadTrack(req, res) {
     const track = new Track({
       title,
       artist,
+      mood,                     
       url: cloud.secure_url,
       publicId: cloud.public_id
     });
