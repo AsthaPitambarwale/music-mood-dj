@@ -8,6 +8,7 @@ export default function App() {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
+  const [uploadMood, setUploadMood] = useState('');   // ← NEW
   const [mood, setMood] = useState('');
   const [playlist, setPlaylist] = useState(null);
   const [queue, setQueue] = useState([]);
@@ -32,15 +33,14 @@ export default function App() {
     if (queue.length) playAtIndex(0);
   }, [queue]);
 
-  /** --- Fetch Tracks --- **/
+  /* ---- Fetch Tracks ---- */
   async function fetchTracks() {
     try {
       const res = await fetch(`${API_BASE}/tracks`);
       const data = await res.json();
-      setTracks(data || []);
+      setTracks(data);
     } catch (err) {
       console.error('Failed to fetch tracks', err);
-      setTracks([]);
     }
   }
 
@@ -48,24 +48,25 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/stats/top-tracks`);
       const data = await res.json();
-      setTopTracks(data || []);
+      setTopTracks(data);
     } catch (err) {
       console.error('Failed to fetch top tracks', err);
-      setTopTracks([]);
     }
   }
 
-  /** --- Upload Track --- **/
+  /* ---- Upload Track ---- */
   async function handleUpload(e) {
     e.preventDefault();
     if (!file) return alert('Select a file!');
 
     setLoading(true);
+
     try {
       const form = new FormData();
       form.append('file', file);
       form.append('title', title || file.name);
       form.append('artist', artist || 'Unknown');
+      form.append('mood', uploadMood || "general");   // ← SEND MOOD
 
       const res = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
@@ -76,10 +77,11 @@ export default function App() {
 
       setTracks(prev => [
         {
-          _id: data._id || Math.random(),
-          title: data.title || title,
-          artist: data.artist || artist,
-          filePath: data.url || data.filePath,
+          _id: data._id,
+          title: data.title,
+          artist: data.artist,
+          url: data.url,
+          mood: data.mood
         },
         ...prev,
       ]);
@@ -87,6 +89,7 @@ export default function App() {
       setFile(null);
       setTitle('');
       setArtist('');
+      setUploadMood('');
       alert('Upload successful!');
     } catch (err) {
       console.error(err);
@@ -96,114 +99,118 @@ export default function App() {
     }
   }
 
-  /** --- Generate Playlist --- **/
+  /* ---- Generate Playlist ---- */
   async function handleGenerate(e) {
     e.preventDefault();
-    if (!mood) return alert('Enter a mood');
+    if (!mood) return alert("Enter a mood");
 
     setLoading(true);
+
     try {
       const res = await fetch(`${API_BASE}/playlists/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mood }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mood })
       });
+
       const created = await res.json();
+
+      if (!created._id) {
+        alert("Could not generate playlist");
+        return;
+      }
 
       const playlistRes = await fetch(`${API_BASE}/playlists/${created._id}`);
       const playlistData = await playlistRes.json();
+
       setPlaylist(playlistData);
 
       const q = (playlistData.tracks || [])
         .map(t => {
-          const track = t.trackId || t.track || {};
-          if (!track.filePath && !track.url) return null;
-          const url = track.url || (track.filePath?.startsWith('http') ? track.filePath : `${API_BASE}${track.filePath}`);
-          return { url, title: track.title || 'Unknown', artist: track.artist || 'Unknown' };
+          const track = t.trackId;
+          if (!track || !track.url) return null;
+          return {
+            url: track.url,
+            title: track.title,
+            artist: track.artist
+          };
         })
         .filter(Boolean);
 
       setQueue(q);
       fetchTopTracks();
+
     } catch (err) {
       console.error(err);
-      alert('Failed to generate playlist');
+      alert("Failed to generate playlist");
     } finally {
       setLoading(false);
     }
   }
 
-  /** --- Playback Controls --- **/
+  /* ---- Player Controls ---- */
   function playAtIndex(i) {
     if (!audioRef.current || i < 0 || i >= queue.length) return;
     setCurrentIndex(i);
     audioRef.current.src = queue[i].url;
-    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+    audioRef.current.play().then(() => setIsPlaying(true));
   }
 
   function togglePlay() {
     if (!audioRef.current) return;
     if (isPlaying) audioRef.current.pause();
-    else audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+    else audioRef.current.play().then(() => setIsPlaying(true));
     setIsPlaying(prev => !prev);
   }
 
   function playTrackUrl(track) {
     if (!track) return;
-    const url = track.url || (track.filePath?.startsWith('http') ? track.filePath : `${API_BASE}${track.filePath}`);
-    setQueue([{ url, title: track.title || 'Unknown', artist: track.artist || 'Unknown' }]);
+    setQueue([{ url: track.url, title: track.title, artist: track.artist }]);
     setCurrentIndex(0);
-    setTimeout(() => audioRef.current?.play().then(() => setIsPlaying(true)), 0);
+    setTimeout(() => audioRef.current?.play(), 100);
   }
 
-  /** --- Render --- **/
+  /* ---- Render ---- */
   return (
-    <div className="app" style={{ padding: 20, maxWidth: 1200, margin: '0 auto' }}>
+    <div className="app" style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
       {/* Header */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700 }}>Music Mood DJ</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Upload → Generate → Play → Top Tracks</p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label className="theme-switch">
-            <input type="checkbox" checked={theme === 'dark'} onChange={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} />
-            <span className="slider"></span>
-          </label>
-          <button style={btnPrimary} onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
-            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-          </button>
-        </div>
+      <header style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+        <h1>Music Mood DJ</h1>
       </header>
 
-      <div className="grid-main" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Left Column */}
+      <div className="grid-main" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+
+        {/* LEFT SIDE */}
         <div>
           {/* Upload Section */}
           <section style={cardStyle}>
             <h2 style={sectionTitle}>Upload Track</h2>
-            <form onSubmit={handleUpload} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <input type="file" accept="audio/*" onChange={e => setFile(e.target.files[0] || null)} style={inputStyle} />
+
+            <form onSubmit={handleUpload} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input type="file" accept="audio/*" onChange={e => setFile(e.target.files[0])} style={inputStyle} />
               <input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} style={inputStyle} />
               <input placeholder="Artist" value={artist} onChange={e => setArtist(e.target.value)} style={inputStyle} />
-              <button type="submit" disabled={loading} style={btnPrimary}>{loading ? 'Uploading...' : 'Upload'}</button>
+              <input placeholder="Mood (happy, love, sad...)" value={uploadMood} onChange={e => setUploadMood(e.target.value)} style={inputStyle} />
+
+              <button type="submit" style={btnPrimary}>{loading ? "Uploading..." : "Upload"}</button>
             </form>
           </section>
 
-          {/* Generate Playlist Section */}
+          {/* Generate Playlist */}
           <section style={cardStyle}>
             <h2 style={sectionTitle}>Generate Mix</h2>
-            <form onSubmit={handleGenerate} style={{ display: 'flex', gap: 8 }}>
-              <input placeholder="Mood prompt" value={mood} onChange={e => setMood(e.target.value)} style={inputStyle} />
-              <button disabled={loading} style={btnPrimary}>{loading ? 'Generating...' : 'Generate'}</button>
+
+            <form onSubmit={handleGenerate} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input placeholder="Enter mood (love, workout, sad..)" value={mood} onChange={e => setMood(e.target.value)} style={inputStyle} />
+              <button style={btnPrimary}>{loading ? "Generating..." : "Generate"}</button>
             </form>
 
             {playlist && (
-              <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'var(--card-bg-alpha)', backdropFilter: 'blur(6px)' }}>
-                <p style={{ fontWeight: 600 }}>Playlist: {playlist.mood}</p>
+              <div style={{ marginTop: 10 }}>
+                <strong>Playlist: {playlist.mood}</strong>
                 <ol>
-                  {(playlist.tracks || []).map((t, i) => (
-                    <li key={i}>{t.trackId?.title || t.track?.title || 'Unknown'} — {t.trackId?.artist || t.track?.artist || 'Unknown'}</li>
+                  {playlist.tracks.map((t, i) => (
+                    <li key={i}>{t.trackId.title} — {t.trackId.artist}</li>
                   ))}
                 </ol>
               </div>
@@ -211,62 +218,38 @@ export default function App() {
           </section>
         </div>
 
-        {/* Right Column */}
+        {/* RIGHT SIDE */}
         <div>
-          {/* Player Section */}
+          {/* Player */}
           <section style={cardStyle}>
             <h2 style={sectionTitle}>Player</h2>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <button style={btnPrimary} onClick={togglePlay}>{isPlaying ? '⏸ Pause' : '▶ Play'}</button>
-              <div>
-                <div style={{ fontWeight: 600 }}>Now: {queue[currentIndex]?.title || '—'}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{queue[currentIndex]?.artist || ''}</div>
-              </div>
-            </div>
-            <audio ref={audioRef} onEnded={() => playAtIndex(currentIndex + 1)} controls style={{ width: '100%', marginTop: 10 }} />
+            <button style={btnPrimary} onClick={togglePlay}>{isPlaying ? "Pause" : "Play"}</button>
+            <audio ref={audioRef} onEnded={() => playAtIndex(currentIndex + 1)} controls style={{ width: "100%", marginTop: 10 }} />
           </section>
 
-          {/* Your Tracks */}
+          {/* Tracks */}
           <section style={cardStyle}>
             <h2 style={sectionTitle}>Your Tracks</h2>
             {tracks.map(t => (
-              <div key={t._id || t.title} style={listItem}>
+              <div key={t._id} style={listItem}>
                 <div>
-                  <div style={{ fontWeight: 600 }}>{t.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.artist}</div>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={btnPrimary} onClick={() => playTrackUrl(t)}>Play</button>
-                  <button style={btnGhost} onClick={() => navigator.clipboard.writeText(t.filePath?.startsWith('http') ? t.filePath : `${API_BASE}${t.filePath}`)}>Copy</button>
-                </div>
-              </div>
-            ))}
-          </section>
-
-          {/* Top Tracks */}
-          <section style={cardStyle}>
-            <h2 style={sectionTitle}>Top Tracks</h2>
-            {topTracks.map(t => (
-              <div key={t._id || t.title} style={listItem}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{t.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.artist}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Selected in mixes: {t.playCount}</div>
+                  <strong>{t.title}</strong>
+                  <div>{t.artist}</div>
                 </div>
                 <button style={btnPrimary} onClick={() => playTrackUrl(t)}>Play</button>
               </div>
             ))}
           </section>
         </div>
+
       </div>
     </div>
   );
 }
 
-// --- Styles ---
-const cardStyle = { background: 'var(--card-bg)', borderRadius: 12, padding: 16, boxShadow: '0 6px 18px rgba(16,24,40,0.06)', marginBottom: 16 };
-const sectionTitle = { fontSize: 15, fontWeight: 600, marginBottom: 8 };
-const inputStyle = { padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: 8, flex: 1, background: 'var(--input-bg)', color: 'var(--text-color)' };
-const btnPrimary = { padding: '6px 12px', borderRadius: 8, border: 'none', background: 'var(--btn-bg)', color: '#fff', cursor: 'pointer', transition: '0.2s' };
-const btnGhost = { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', cursor: 'pointer', transition: '0.2s' };
-const listItem = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 10, borderBottom: '1px dashed var(--border-color)', borderRadius: 6, marginBottom: 6 };
+/* ---- Styles ---- */
+const cardStyle = { background: "#fff", borderRadius: 12, padding: 16, boxShadow: "0 4px 10px rgba(0,0,0,0.1)" };
+const sectionTitle = { fontSize: 16, fontWeight: 600, marginBottom: 8 };
+const inputStyle = { padding: 10, border: "1px solid #ccc", borderRadius: 8, width: "100%" };
+const btnPrimary = { padding: "8px 14px", background: "#007bff", color: "#fff", borderRadius: 8, cursor: "pointer" };
+const listItem = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: 8, borderBottom: "1px dashed #ccc" };
