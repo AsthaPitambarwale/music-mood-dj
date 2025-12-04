@@ -8,7 +8,8 @@ export default function App() {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
-  const [mood, setMood] = useState("");
+  const [uploadMood, setUploadMood] = useState(""); // for Upload form
+  const [generateMood, setGenerateMood] = useState(""); // for Generate Mix form
   const [playlist, setPlaylist] = useState(null);
   const [queue, setQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -70,7 +71,7 @@ export default function App() {
       form.append("file", file);
       form.append("title", title || file.name);
       form.append("artist", artist || "Unknown");
-      form.append("mood", mood || ""); // optional: include mood
+      form.append("mood", uploadMood || ""); // send separate mood for upload
 
       const res = await fetch(`${API_BASE}/upload`, {
         method: "POST",
@@ -84,6 +85,7 @@ export default function App() {
           title: data.title || title,
           artist: data.artist || artist,
           url: data.url || data.filePath,
+          mood: data.mood || uploadMood || "",
         },
         ...prev,
       ]);
@@ -91,7 +93,7 @@ export default function App() {
       setFile(null);
       setTitle("");
       setArtist("");
-      setMood("");
+      setUploadMood(""); // reset only upload mood
       alert("Upload Successful!");
     } catch (err) {
       console.error(err);
@@ -104,14 +106,14 @@ export default function App() {
   /** Generate playlist */
   async function handleGenerate(e) {
     e.preventDefault();
-    if (!mood) return alert("Enter a mood");
+    if (!generateMood) return alert("Enter a mood");
 
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/playlists/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mood }),
+        body: JSON.stringify({ mood: generateMood }),
       });
       const created = await res.json();
 
@@ -137,6 +139,7 @@ export default function App() {
 
       setQueue(q);
       fetchTopTracks();
+      setGenerateMood(""); // reset generate mood after playlist
     } catch (err) {
       console.error(err);
       alert("Failed to generate playlist");
@@ -216,7 +219,7 @@ export default function App() {
               <input type="file" accept="audio/*" onChange={(e) => setFile(e.target.files[0] || null)} style={inputStyle} />
               <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} />
               <input placeholder="Artist" value={artist} onChange={(e) => setArtist(e.target.value)} style={inputStyle} />
-              <input placeholder="Mood (optional)" value={mood} onChange={(e) => setMood(e.target.value)} style={inputStyle} />
+              <input placeholder="Mood (optional)" value={uploadMood} onChange={(e) => setUploadMood(e.target.value)} style={inputStyle} />
               <button type="submit" disabled={loading} style={btnPrimary}>
                 {loading ? "Uploading…" : "Upload"}
               </button>
@@ -227,7 +230,7 @@ export default function App() {
           <section style={cardStyle}>
             <h2 style={sectionTitle}>Generate Mix</h2>
             <form onSubmit={handleGenerate} style={{ width: "100%" }}>
-              <input placeholder="Mood prompt (love, happy, sad...)" value={mood} onChange={(e) => setMood(e.target.value)} style={inputStyle} />
+              <input placeholder="Mood prompt (love, happy, sad...)" value={generateMood} onChange={(e) => setGenerateMood(e.target.value)} style={inputStyle} />
               <button disabled={loading} style={btnPrimary}>
                 {loading ? "Generating…" : "Generate Mix"}
               </button>
