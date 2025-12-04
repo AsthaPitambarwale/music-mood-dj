@@ -7,7 +7,8 @@ const trackSchema = new mongoose.Schema(
     url: { type: String, required: true }, // uploaded file URL
     publicId: { type: String },
     duration: { type: Number },
-    playCount: { type: Number, default: 0 } // REQUIRED for top tracks + mix
+    playCount: { type: Number, default: 0 }, // REQUIRED for top tracks + mix
+    mood: { type: String, default: "unknown" }
   },
   { timestamps: true }
 );
