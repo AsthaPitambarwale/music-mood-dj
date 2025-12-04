@@ -23,3 +23,28 @@ export async function getTopTracks(req, res) {
     res.status(500).json({ error: err.message });
   }
 }
+
+export async function incrementPlayCount(req, res) {
+  try {
+    const { id } = req.params;
+
+    const track = await Track.findById(id);
+    if (!track) {
+      return res.status(404).json({ error: "Track not found" });
+    }
+
+    track.playCount += 1;
+    await track.save();
+
+    // Clear cache since top tracks changed
+    cache = null;
+    cacheExpiry = 0;
+
+    res.json({
+      message: "Play count updated",
+      playCount: track.playCount
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
