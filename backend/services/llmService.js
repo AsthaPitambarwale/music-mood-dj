@@ -1,70 +1,71 @@
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // use environment variable, not hardcoded
+  apiKey: process.env.OPENAI_API_KEY, // secure
 });
 
 /**
- * Generate a playlist for a given mood using available tracks.
- * Each track in result includes:
- *   - trackId: string (must match one of the provided track IDs)
- *   - weight: number (0 to 1)
- *
- * @param {string} mood - Mood for playlist generation
- * @param {Array} tracks - Array of Track objects from DB
- * @returns {Array} - Array of { trackId, weight }
+ * Generate a playlist using LLM
  */
 export async function generatePlaylist(mood, tracks) {
-  if (!tracks || tracks.length === 0) return [];
+  if (!Array.isArray(tracks) || tracks.length === 0) return [];
 
-  // Prepare track list for LLM
+  // Make precise list for LLM
   const trackList = tracks
-    .map(t => `ID: ${t._id.toString()} | ${t.title} — ${t.artist}`)
+    .map(t => `ID: ${t._id} | ${t.title} — ${t.artist}`)
     .join("\n");
 
   const prompt = `
-You are selecting the best matching tracks for the mood: "${mood}".
+Your task is to pick the best matching tracks for the mood: "${mood}".
 
-Available tracks (use ONLY these):
+ONLY use the tracks listed below:
 ${trackList}
 
-Return ONLY a valid JSON array.
-Each item must look like:
-{
-  "trackId": "<ID from list>",
-  "weight": <number between 0 and 1>
-}
+Return ONLY a JSON array of objects:
+[
+  {
+    "trackId": "ID_FROM_LIST",
+    "weight": 0.8
+  }
+]
 
 Rules:
-- Choose 3 to 6 tracks.
-- "trackId" must be EXACTLY one of the provided IDs.
-- No additional commentary. Reply ONLY with JSON.
+- Choose 3 to 6 items.
+- Do NOT create fake IDs.
+- Do NOT change titles.
+- Do NOT output anything except JSON.
+  No text, no explanation, no markdown.
 `;
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-4o-mini", // fast + cheap + reliable
+      model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.4,
+      temperature: 0.2,
     });
 
-    const content = response.choices[0].message.content.trim();
+    let content = response.choices[0].message.content.trim();
 
-    // Extract JSON array from response
+    // Extract JSON array safely
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.error("❌ LLM did not return JSON:", content);
+      console.error("❌ LLM returned invalid output:", content);
       return [];
     }
 
-    const result = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonMatch[0]);
 
-    // Optional: filter invalid entries
-    return result.filter(
-      r => r.trackId && typeof r.weight === "number" && r.weight >= 0 && r.weight <= 1
+    // Filter out invalid entries
+    return parsed.filter(
+      r =>
+        r.trackId &&
+        typeof r.trackId === "string" &&
+        typeof r.weight === "number" &&
+        r.weight >= 0 &&
+        r.weight <= 1
     );
   } catch (err) {
-    console.error("❌ LLM playlist generation error:", err);
+    console.error("❌ LLM playlist generation FAILED:", err);
     return [];
   }
 }
