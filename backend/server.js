@@ -9,7 +9,7 @@ import path from "path";
 
 import trackRoutes from "./routes/tracks.js";
 import playlistRoutes from "./routes/playlists.js";
-import statsRoutes from "./routes/statsRoutes.js";
+import statsRoutes from "./routes/stats.js";
 
 dotenv.config();
 
