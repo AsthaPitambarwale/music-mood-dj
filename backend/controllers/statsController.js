@@ -131,3 +131,7 @@ export async function getPlaylist(req, res) {
     res.status(500).json({ error: err.message });
   }
 }
+
+export {
+  getTopTracks
+};
