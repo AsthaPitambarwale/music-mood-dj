@@ -154,35 +154,37 @@ export default function App() {
     setCurrentIndex(i);
     const track = queue[i];
     audioRef.current.src = track.url;
-    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => { });
   }
 
   /** Toggle play/pause */
   function togglePlay() {
     if (!audioRef.current) return;
     if (isPlaying) audioRef.current.pause();
-    else audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+    else audioRef.current.play().then(() => setIsPlaying(true)).catch(() => { });
     setIsPlaying((p) => !p);
   }
 
   /** Play single track */
-  function playTrackUrl(track) {
-    if (!track || !audioRef.current) return;
+  async function playTrackUrl(track) {
+    if (!track) return;
+
     const url = track.url.startsWith("http") ? track.url : `${API_BASE}${track.url}`;
 
-    // Increment play count
-    fetch(`${API_BASE}/stats/play/${track._id}`, { method: "POST" });
+    try {
+      // Increment play count
+      await fetch(`${API_BASE}/stats/play/${track._id}`, { method: "POST" });
+      fetchTopTracks(); // refresh top tracks
 
-    setQueue([{ url, title: track.title, artist: track.artist }]);
-    setCurrentIndex(0);
+      setQueue([{ url, title: track.title, artist: track.artist }]);
+      setCurrentIndex(0);
 
-    setTimeout(() => {
-      audioRef.current.src = url;
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
-    }, 50);
-
-    fetchTopTracks();
+      setTimeout(() => audioRef.current?.play().then(() => setIsPlaying(true)), 0);
+    } catch (err) {
+      console.error("Play count increment failed:", err);
+    }
   }
+
 
   /** --- RENDER --- */
   return (
