@@ -16,39 +16,47 @@ export const upload = multer({ storage });
 
 export async function uploadTrack(req, res) {
   try {
-    const { title, artist, mood } = req.body; // get mood from frontend
+    const { title, artist, mood } = req.body;
     const file = req.file;
 
-    if (!file) return res.status(400).json({ error: "No file uploaded" });
+    if (!file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
 
     const cloud = await cloudinary.v2.uploader.upload(file.path, {
-      resource_type: "video", // keep for audio/video
+      resource_type: "auto", // <— FIXED (audio/video)
     });
 
-    fs.unlinkSync(file.path);
+    // Delete local file after upload
+    try {
+      fs.unlinkSync(file.path);
+    } catch (err) {
+      console.warn("Failed deleting temp file:", err);
+    }
 
-    // Create track with mood
     const track = new Track({
-      title: title || "Unknown",
-      artist: artist || "Unknown",
-      mood: mood || "unknown", // default to unknown if empty
+      title: title?.trim() || "Unknown",
+      artist: artist?.trim() || "Unknown",
+      mood: mood?.trim() || "unknown",
       url: cloud.secure_url,
       publicId: cloud.public_id,
     });
 
     await track.save();
 
-    res.json(track); // return full track including mood
+    res.json(track);
   } catch (err) {
+    console.error("Upload error:", err);
     res.status(500).json({ error: err.message });
   }
 }
 
 export async function listTracks(req, res) {
   try {
-    const tracks = await Track.find();
+    const tracks = await Track.find().sort({ createdAt: -1 });
     res.json(tracks);
   } catch (err) {
+    console.error("List tracks error:", err);
     res.status(500).json({ error: err.message });
   }
 }
