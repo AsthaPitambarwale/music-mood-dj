@@ -6,10 +6,12 @@ export async function createPlaylist(req, res) {
   try {
     const { mood } = req.body;
 
-    let moodTracks = await Track.find({ mood: { $regex: mood, $options: "i" } });
+    let moodTracks = await Track.find({
+      mood: { $regex: mood, $options: "i" }
+    });
 
     if (moodTracks.length === 0) {
-      console.log("⚠️ No tracks found for mood:", mood, " → Using all tracks.");
+      console.log(`⚠️ No tracks found for mood "${mood}". Using all tracks.`);
       moodTracks = await Track.find();
     }
 
@@ -24,11 +26,13 @@ export async function createPlaylist(req, res) {
     for (let i = 0; i < llmResult.length; i++) {
       const item = llmResult[i];
 
-      // find track
-      const track = moodTracks.find(t => t.title === item.title);
+      if (!item.trackId) continue; // skip invalid items
+
+      const track = moodTracks.find(
+        t => t._id.toString() === item.trackId.toString()
+      );
 
       if (track) {
-        // update play count
         track.playCount += 1;
         await track.save();
 
@@ -40,6 +44,12 @@ export async function createPlaylist(req, res) {
       }
     }
 
+    if (tracksData.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "No valid tracks were mapped from playlist generator." });
+    }
+
     const playlist = new Playlist({
       mood,
       tracks: tracksData
@@ -48,7 +58,9 @@ export async function createPlaylist(req, res) {
     await playlist.save();
 
     res.json(playlist);
+
   } catch (err) {
+    console.error("❌ Playlist creation error:", err);
     res.status(500).json({ error: err.message });
   }
 }
@@ -58,8 +70,13 @@ export async function getPlaylist(req, res) {
     const playlist = await Playlist.findById(req.params.id)
       .populate("tracks.trackId");
 
+    if (!playlist) {
+      return res.status(404).json({ error: "Playlist not found" });
+    }
+
     res.json(playlist);
   } catch (err) {
+    console.error("❌ Get playlist error:", err);
     res.status(500).json({ error: err.message });
   }
 }
