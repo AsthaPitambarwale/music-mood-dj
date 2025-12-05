@@ -25,7 +25,7 @@ export default function App() {
     localStorage.setItem("mmj_theme", theme);
   }, [theme]);
 
-  /** Load Tracks */
+  /** Load Tracks & Top Tracks */
   useEffect(() => {
     fetchTracks();
     fetchTopTracks();
@@ -93,7 +93,7 @@ export default function App() {
       setFile(null);
       setTitle("");
       setArtist("");
-      setUploadMood(""); // reset only upload mood
+      setUploadMood("");
       alert("Upload Successful!");
     } catch (err) {
       console.error(err);
@@ -139,7 +139,7 @@ export default function App() {
 
       setQueue(q);
       fetchTopTracks();
-      setGenerateMood(""); // reset generate mood after playlist
+      setGenerateMood("");
     } catch (err) {
       console.error(err);
       alert("Failed to generate playlist");
@@ -152,11 +152,9 @@ export default function App() {
   function playAtIndex(i) {
     if (!audioRef.current || i < 0 || i >= queue.length) return;
     setCurrentIndex(i);
-    audioRef.current.src = queue[i].url;
-    audioRef.current
-      .play()
-      .then(() => setIsPlaying(true))
-      .catch(() => {});
+    const track = queue[i];
+    audioRef.current.src = track.url;
+    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
   }
 
   /** Toggle play/pause */
@@ -169,42 +167,33 @@ export default function App() {
 
   /** Play single track */
   function playTrackUrl(track) {
-    if (!track) return;
-
+    if (!track || !audioRef.current) return;
     const url = track.url.startsWith("http") ? track.url : `${API_BASE}${track.url}`;
 
-    // Increment play count on backend
+    // Increment play count
     fetch(`${API_BASE}/stats/play/${track._id}`, { method: "POST" });
 
     setQueue([{ url, title: track.title, artist: track.artist }]);
     setCurrentIndex(0);
 
-    setTimeout(() => audioRef.current?.play().then(() => setIsPlaying(true)), 0);
+    setTimeout(() => {
+      audioRef.current.src = url;
+      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+    }, 50);
+
     fetchTopTracks();
   }
 
-  /** Render */
+  /** --- RENDER --- */
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
       {/* Header */}
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 32,
-        }}
-      >
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800 }}>Music Mood DJ</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
-            Upload → Generate Mix → Play → Top Tracks
-          </p>
+          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>Upload → Generate Mix → Play → Top Tracks</p>
         </div>
-        <button
-          style={btnPrimarySmall}
-          onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-        >
+        <button style={btnPrimarySmall} onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
           {theme === "dark" ? "Light Mode" : "Dark Mode"}
         </button>
       </header>
