@@ -132,6 +132,21 @@ export async function getPlaylist(req, res) {
   }
 }
 
+export const getTopTracks = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+
+    const tracks = await Track.find()
+      .sort({ playCount: -1 })
+      .limit(limit);
+
+    res.json(tracks);
+  } catch (err) {
+    console.error("Error fetching top tracks:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 export {
   getTopTracks
 };
