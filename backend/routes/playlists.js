@@ -6,8 +6,8 @@ import {
 
 const router = express.Router();
 
+router.post("/generate", createPlaylist);
 router.post("/", createPlaylist);
-
 router.get("/:id", getPlaylist);
 
 export default router;
