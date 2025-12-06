@@ -1,31 +1,10 @@
 import Track from "../models/Track.js";
 
-/**
- * Get top played tracks
- */
-export async function getTopTracks(req, res) {
-  try {
-    const limit = parseInt(req.query.limit) || 10;
-
-    const tracks = await Track.find()
-      .sort({ playCount: -1 })
-      .limit(limit);
-
-    return res.json(tracks);
-  } catch (err) {
-    console.error("getTopTracks error:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-}
-
-/**
- * Increment play count for a track
- */
 export async function incrementPlayCount(req, res) {
   try {
-    const trackId = req.params.id;
+    const { id } = req.params;
 
-    const track = await Track.findById(trackId);
+    const track = await Track.findById(id);
     if (!track) {
       return res.status(404).json({ error: "Track not found" });
     }
@@ -33,9 +12,22 @@ export async function incrementPlayCount(req, res) {
     track.playCount = (track.playCount || 0) + 1;
     await track.save();
 
-    return res.json({ success: true, playCount: track.playCount });
+    res.json({ success: true, playCount: track.playCount });
   } catch (err) {
-    console.error("incrementPlayCount error:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error("Play count error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+export async function getTopTracks(req, res) {
+  try {
+    const top = await Track.find()
+      .sort({ playCount: -1 })
+      .limit(10);
+
+    res.json(top);
+  } catch (err) {
+    console.error("Top tracks error:", err);
+    res.status(500).json({ error: err.message });
   }
 }
