@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://music-mood-dj.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 export default function App() {
   const [tracks, setTracks] = useState([]);
@@ -31,17 +31,10 @@ export default function App() {
     fetchTopTracks();
   }, []);
 
-  /** Auto-play when queue changes */
+  /** Auto-play when queue changes if first time */
   useEffect(() => {
-    if (queue.length) playAtIndex(0);
+    if (queue.length && currentIndex === 0 && !isPlaying) playAtIndex(0);
   }, [queue]);
-
-  /** Play Count on Play Button */
-  const onSongPlay = (trackId) => {
-    fetch(`${API_BASE}/stats/play/${trackId}`, {
-      method: "POST"
-    }).then(() => fetchTopTracks());
-  };
 
   /** Fetch all tracks */
   async function fetchTracks() {
@@ -80,22 +73,28 @@ export default function App() {
       form.append("artist", artist || "Unknown");
       form.append("mood", uploadMood || "");
 
-      const res = await fetch(`${API_BASE}/upload`, {
-        method: "POST",
-        body: form,
-      });
+      const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: form });
       const data = await res.json();
 
-      setTracks((prev) => [
-        {
-          _id: data._id,
-          title: data.title,
-          artist: data.artist,
-          url: data.url || data.filePath,
-          mood: data.mood,
-          playCount: 0   // ← FIX: always default count
-        },
+      const newTrack = {
+        _id: data._id || Math.random(),
+        title: data.title || title,
+        artist: data.artist || artist,
+        url: data.url || data.filePath,
+        mood: data.mood || uploadMood || "",
+      };
+
+      // Add to tracks list
+      setTracks((prev) => [newTrack, ...prev]);
+
+      // Append to player queue
+      setQueue((prev) => [
         ...prev,
+        {
+          url: newTrack.url.startsWith("http") ? newTrack.url : `${API_BASE}${newTrack.url}`,
+          title: newTrack.title,
+          artist: newTrack.artist,
+        },
       ]);
 
       setFile(null);
@@ -103,6 +102,7 @@ export default function App() {
       setArtist("");
       setUploadMood("");
       alert("Upload Successful!");
+      fetchTopTracks();
     } catch (err) {
       console.error(err);
       alert("Upload failed");
@@ -111,7 +111,7 @@ export default function App() {
     }
   }
 
-  /** Generate playlist using mood-matching tracks (no AI) */
+  /** Generate playlist */
   async function handleGenerate(e) {
     e.preventDefault();
     if (!generateMood) return alert("Enter a mood");
@@ -123,30 +123,30 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mood: generateMood }),
       });
-
       const created = await res.json();
 
       const playlistRes = await fetch(`${API_BASE}/playlists/${created._id}`);
       const playlistData = await playlistRes.json();
       setPlaylist(playlistData);
 
-      const q = (playlistData.tracks || [])
+      const newQueue = (playlistData.tracks || [])
         .map((t) => {
-          const track = t.trackId || {}; // populated backend FIX
+          const track = t.trackId || t.track || {};
           if (!track.url) return null;
 
-          // increment play count for mix usage
+          // Increment play count
           fetch(`${API_BASE}/stats/play/${track._id}`, { method: "POST" });
 
           return {
             url: track.url.startsWith("http") ? track.url : `${API_BASE}${track.url}`,
-            title: track.title,
-            artist: track.artist,
+            title: track.title || "Unknown",
+            artist: track.artist || "Unknown",
           };
         })
         .filter(Boolean);
 
-      setQueue(q);
+      // Append generated tracks to queue
+      setQueue((prev) => [...prev, ...newQueue]);
 
       fetchTopTracks();
       setGenerateMood("");
@@ -164,10 +164,7 @@ export default function App() {
     setCurrentIndex(i);
     const track = queue[i];
     audioRef.current.src = track.url;
-    audioRef.current
-      .play()
-      .then(() => setIsPlaying(true))
-      .catch(() => {});
+    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
   }
 
   /** Toggle play/pause */
@@ -178,20 +175,21 @@ export default function App() {
     setIsPlaying((p) => !p);
   }
 
-  /** Play single track */
+  /** Play single track from any section */
   async function playTrackUrl(track) {
     if (!track) return;
-
     const url = track.url.startsWith("http") ? track.url : `${API_BASE}${track.url}`;
 
     try {
+      // Increment play count
       await fetch(`${API_BASE}/stats/play/${track._id}`, { method: "POST" });
-      fetchTopTracks();
+      fetchTopTracks(); // refresh top tracks
 
-      setQueue([{ url, title: track.title, artist: track.artist }]);
-      setCurrentIndex(0);
+      // Add to queue without removing existing
+      setQueue((prev) => [...prev, { url, title: track.title, artist: track.artist }]);
 
-      setTimeout(() => audioRef.current?.play().then(() => setIsPlaying(true)), 0);
+      // Auto-play if queue was empty
+      if (queue.length === 0) playAtIndex(0);
     } catch (err) {
       console.error("Play count increment failed:", err);
     }
@@ -200,6 +198,7 @@ export default function App() {
   /** --- RENDER --- */
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
+      {/* Header */}
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800 }}>Music Mood DJ</h1>
@@ -211,7 +210,7 @@ export default function App() {
       </header>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-        {/* LEFT SIDE */}
+        {/* LEFT COLUMN */}
         <div>
           {/* Upload */}
           <section style={cardStyle}>
@@ -221,32 +220,23 @@ export default function App() {
               <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} />
               <input placeholder="Artist" value={artist} onChange={(e) => setArtist(e.target.value)} style={inputStyle} />
               <input placeholder="Mood (optional)" value={uploadMood} onChange={(e) => setUploadMood(e.target.value)} style={inputStyle} />
-              <button type="submit" disabled={loading} style={btnPrimary}>
-                {loading ? "Uploading…" : "Upload"}
-              </button>
+              <button type="submit" disabled={loading} style={btnPrimary}>{loading ? "Uploading…" : "Upload"}</button>
             </form>
           </section>
 
-          {/* Generate Mix */}
+          {/* Generate */}
           <section style={cardStyle}>
             <h2 style={sectionTitle}>Generate Mix</h2>
             <form onSubmit={handleGenerate} style={{ width: "100%" }}>
-              <input
-                placeholder="Mood prompt (love, happy, sad...)"
-                value={generateMood}
-                onChange={(e) => setGenerateMood(e.target.value)}
-                style={inputStyle}
-              />
-              <button disabled={loading} style={btnPrimary}>
-                {loading ? "Generating…" : "Generate Mix"}
-              </button>
+              <input placeholder="Mood prompt (love, happy, sad...)" value={generateMood} onChange={(e) => setGenerateMood(e.target.value)} style={inputStyle} />
+              <button disabled={loading} style={btnPrimary}>{loading ? "Generating…" : "Generate Mix"}</button>
             </form>
             {playlist && (
               <div style={playlistBox}>
                 <b>Playlist: {playlist.mood}</b>
                 <ol>
                   {playlist.tracks?.map((t, i) => (
-                    <li key={i}>{t.trackId?.title} — {t.trackId?.artist}</li>
+                    <li key={i}>{t.trackId?.title || "Unknown"} — {t.trackId?.artist || "Unknown"}</li>
                   ))}
                 </ol>
               </div>
@@ -254,7 +244,7 @@ export default function App() {
           </section>
         </div>
 
-        {/* RIGHT SIDE */}
+        {/* RIGHT COLUMN */}
         <div>
           {/* Player */}
           <section style={cardStyle}>
