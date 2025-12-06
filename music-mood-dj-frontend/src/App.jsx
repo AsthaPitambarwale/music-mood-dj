@@ -36,6 +36,12 @@ export default function App() {
     if (queue.length) playAtIndex(0);
   }, [queue]);
 
+  const onSongPlay = (trackId) => {
+  fetch(`/api/stats/play/${trackId}`, {
+    method: "POST"
+  });
+};
+
   /** Fetch all tracks */
   async function fetchTracks() {
     try {
