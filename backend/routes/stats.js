@@ -7,7 +7,6 @@ import {
 const router = express.Router();
 
 router.get("/top", getTopTracks);
-
 router.post("/play/:id", incrementPlayCount);
 
 export default router;
