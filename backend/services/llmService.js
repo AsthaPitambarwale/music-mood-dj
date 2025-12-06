@@ -5,12 +5,11 @@ const client = new OpenAI({
 });
 
 /**
- * Generate playlist using LLM with safe JSON output
+ * Generate playlist using LLM with strict JSON array output
  */
 export async function generatePlaylist(mood, tracks) {
   if (!Array.isArray(tracks) || tracks.length === 0) return [];
 
-  // Provide strict item list
   const trackList = tracks.map(t => ({
     id: t._id.toString(),
     title: t.title,
@@ -20,58 +19,54 @@ export async function generatePlaylist(mood, tracks) {
   const prompt = `
 You are a playlist generator. Mood: "${mood}"
 
-Here are the ONLY allowed tracks (use ONLY these):
+Allowed tracks (USE ONLY THESE):
 ${JSON.stringify(trackList, null, 2)}
 
-Return ONLY a JSON ARRAY, like this example:
+Return ONLY a JSON ARRAY.
+No wrapper objects.
+No markdown.
+No text.
+
+Correct format:
 [
-  { "trackId": "6567abcd...", "weight": 0.9 },
-  { "trackId": "6567bcde...", "weight": 0.7 }
+  { "trackId": "ID_HERE", "weight": 0.8 },
+  { "trackId": "ID_HERE", "weight": 0.6 }
 ]
 
 Rules:
 - Choose 3 to 6 tracks.
-- trackId MUST be one of the IDs given.
-- weight MUST be between 0.1 and 1.
-- Output strictly pure JSON. No markdown. No explanation.
+- trackId MUST match one of the provided ids.
+- weight must be 0.1 to 1.
+- Output MUST be ONLY the JSON array.
 `;
 
   try {
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.1,
-      response_format: { type: "json_object" }  // ENSURES VALID JSON (VERY IMPORTANT)
+      temperature: 0.1
     });
 
-    // NEW: enforce JSON wrapper format from response_format
-    let result = response.choices[0].message.content;
+    let content = response.choices[0].message.content.trim();
 
-    // Parse entire JSON object
-    let parsedObj = JSON.parse(result);
-
-    // LLM may return: { playlist: [ ... ] }
-    let playlist = parsedObj.playlist || parsedObj.data || parsedObj.result || parsedObj;
-
-    if (!Array.isArray(playlist)) {
-      console.error("❌ Invalid structured format:", result);
+    // Extract array only
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error("❌ LLM did NOT output JSON array:", content);
       return [];
     }
 
-    // Final cleanup + validation
-    return playlist
-      .map(item => ({
-        trackId: item.trackId?.toString(),
-        weight: Number(item.weight) || 0.5
-      }))
-      .filter(item => {
-        return (
-          item.trackId &&
-          tracks.find(t => t._id.toString() === item.trackId) &&
-          item.weight > 0 &&
-          item.weight <= 1
-        );
-      });
+    // Parse final array
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Validate
+    return parsed.filter(item =>
+      item.trackId &&
+      tracks.find(t => t._id.toString() === item.trackId) &&
+      item.weight >= 0.1 &&
+      item.weight <= 1
+    );
+
   } catch (err) {
     console.error("❌ LLM playlist generation FAILED:", err);
     return [];
