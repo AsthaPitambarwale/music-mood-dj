@@ -15,91 +15,65 @@ export async function createPlaylist(req, res) {
 
     const cleanMood = mood.trim();
 
-    /** 1) Fetch mood-based tracks */
+    /** 1) Fetch tracks matching mood */
     let moodTracks = await Track.find({
       mood: { $regex: cleanMood, $options: "i" }
     });
 
     if (!moodTracks.length) {
-      console.warn(`⚠ No mood tracks for "${cleanMood}". Using all tracks.`);
+      console.warn(`⚠ No tracks found for mood "${cleanMood}". Using all tracks.`);
       moodTracks = await Track.find();
     }
 
-    /** Prepare lookup maps */
+    /** Prepare a quick lookup */
     const idMap = new Map();
-    const titleMap = new Map();
+    moodTracks.forEach(t => idMap.set(t._id.toString(), t));
 
-    moodTracks.forEach(t => {
-      idMap.set(t._id.toString(), t);
-      titleMap.set(t.title.toLowerCase(), t);
-    });
-
-    /** 2) Fetch playlist suggestion from LLM */
-    let llm = [];
+    /** 2) Generate playlist via LLM */
+    let llmResults = [];
     try {
-      llm = await generatePlaylist(cleanMood, moodTracks);
-      console.log("LLM returned:", llm);
-    } catch (e) {
-      console.error("❌ LLM error:", e);
+      llmResults = await generatePlaylist(cleanMood, moodTracks);
+      console.log("LLM returned:", llmResults);
+    } catch (err) {
+      console.error("❌ LLM generation failed:", err);
+      llmResults = [];
     }
 
     const tracksData = [];
 
-    /** 3) Convert LLM response to actual DB tracks */
-    if (Array.isArray(llm) && llm.length > 0) {
-      for (let item of llm) {
-        let track = null;
+    /** 3) Map LLM result -> DB tracks */
+    if (Array.isArray(llmResults)) {
+      for (let item of llmResults) {
+        const id = item.trackId?.toString();
+        if (!idMap.has(id)) continue; // reject hallucinations
 
-        /** A) Try ID */
-        if (item.trackId && idMap.has(item.trackId.toString())) {
-          track = idMap.get(item.trackId.toString());
-        }
-
-        /** B) Try direct title (must exist) */
-        if (!track && item.title) {
-          const lower = item.title.toLowerCase();
-          if (titleMap.has(lower)) track = titleMap.get(lower);
-        }
-
-        /** C) Fuzzy match (substr) */
-        if (!track && item.title) {
-          const low = item.title.toLowerCase();
-          track = moodTracks.find(
-            t =>
-              t.title.toLowerCase().includes(low) ||
-              low.includes(t.title.toLowerCase())
-          );
-        }
-
-        if (!track) continue;
+        const track = idMap.get(id);
 
         tracksData.push({
           trackId: track._id,
           order: tracksData.length + 1,
-          weight: item.weight ?? 1
+          weight: item.weight ?? 0.5
         });
 
         if (tracksData.length >= 6) break;
       }
     }
 
-    /** 4) If LLM completely fails → fallback */
+    /** 4) Fallback if LLM completely failed */
     if (tracksData.length === 0) {
-      console.warn("⚠ LLM mapping failed. Using fallback random playlist.");
+      console.warn("⚠ LLM failed — using fallback playlist.");
 
-      const shuffled = [...moodTracks].sort(() => Math.random() - 0.5);
-      const pick = shuffled.slice(0, Math.min(4, shuffled.length));
-
-      pick.forEach((track, index) => {
+      const fallback = moodTracks.slice(0, Math.min(4, moodTracks.length));
+      fallback.forEach((track, index) => {
         tracksData.push({
           trackId: track._id,
           order: index + 1,
-          weight: 1
+          weight: 0.5
         });
       });
     }
 
-    /** 5) Save to DB */
+    /** 5) Save playlist */
     const playlist = new Playlist({
       mood: cleanMood,
       tracks: tracksData
@@ -107,10 +81,8 @@ export async function createPlaylist(req, res) {
 
     await playlist.save();
 
-    /** 6) Populate and return final playlist */
-    const full = await Playlist.findById(playlist._id).populate(
-      "tracks.trackId"
-    );
+    /** 6) Return populated playlist */
+    const full = await Playlist.findById(playlist._id).populate("tracks.trackId");
 
     return res.json(full);
   } catch (err) {
@@ -124,9 +96,7 @@ export async function createPlaylist(req, res) {
  */
 export async function getPlaylist(req, res) {
   try {
-    const playlist = await Playlist.findById(req.params.id).populate(
-      "tracks.trackId"
-    );
+    const playlist = await Playlist.findById(req.params.id).populate("tracks.trackId");
 
     if (!playlist) {
       return res.status(404).json({ error: "Playlist not found" });
