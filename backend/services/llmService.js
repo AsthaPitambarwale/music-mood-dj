@@ -1,69 +1,77 @@
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // secure
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 /**
- * Generate a playlist using LLM
+ * Generate playlist using LLM with safe JSON output
  */
 export async function generatePlaylist(mood, tracks) {
   if (!Array.isArray(tracks) || tracks.length === 0) return [];
 
-  // Make precise list for LLM
-  const trackList = tracks
-    .map(t => `ID: ${t._id} | ${t.title} — ${t.artist}`)
-    .join("\n");
+  // Provide strict item list
+  const trackList = tracks.map(t => ({
+    id: t._id.toString(),
+    title: t.title,
+    artist: t.artist
+  }));
 
   const prompt = `
-Your task is to pick the best matching tracks for the mood: "${mood}".
+You are a playlist generator. Mood: "${mood}"
 
-ONLY use the tracks listed below:
-${trackList}
+Here are the ONLY allowed tracks (use ONLY these):
+${JSON.stringify(trackList, null, 2)}
 
-Return ONLY a JSON array of objects:
+Return ONLY a JSON ARRAY, like this example:
 [
-  {
-    "trackId": "ID_FROM_LIST",
-    "weight": 0.8
-  }
+  { "trackId": "6567abcd...", "weight": 0.9 },
+  { "trackId": "6567bcde...", "weight": 0.7 }
 ]
 
 Rules:
-- Choose 3 to 6 items.
-- Do NOT create fake IDs.
-- Do NOT change titles.
-- Do NOT output anything except JSON.
-  No text, no explanation, no markdown.
+- Choose 3 to 6 tracks.
+- trackId MUST be one of the IDs given.
+- weight MUST be between 0.1 and 1.
+- Output strictly pure JSON. No markdown. No explanation.
 `;
 
   try {
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
+      temperature: 0.1,
+      response_format: { type: "json_object" }  // ENSURES VALID JSON (VERY IMPORTANT)
     });
 
-    let content = response.choices[0].message.content.trim();
+    // NEW: enforce JSON wrapper format from response_format
+    let result = response.choices[0].message.content;
 
-    // Extract JSON array safely
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      console.error("❌ LLM returned invalid output:", content);
+    // Parse entire JSON object
+    let parsedObj = JSON.parse(result);
+
+    // LLM may return: { playlist: [ ... ] }
+    let playlist = parsedObj.playlist || parsedObj.data || parsedObj.result || parsedObj;
+
+    if (!Array.isArray(playlist)) {
+      console.error("❌ Invalid structured format:", result);
       return [];
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
-
-    // Filter out invalid entries
-    return parsed.filter(
-      r =>
-        r.trackId &&
-        typeof r.trackId === "string" &&
-        typeof r.weight === "number" &&
-        r.weight >= 0 &&
-        r.weight <= 1
-    );
+    // Final cleanup + validation
+    return playlist
+      .map(item => ({
+        trackId: item.trackId?.toString(),
+        weight: Number(item.weight) || 0.5
+      }))
+      .filter(item => {
+        return (
+          item.trackId &&
+          tracks.find(t => t._id.toString() === item.trackId) &&
+          item.weight > 0 &&
+          item.weight <= 1
+        );
+      });
   } catch (err) {
     console.error("❌ LLM playlist generation FAILED:", err);
     return [];
